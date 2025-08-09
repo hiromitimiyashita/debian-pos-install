@@ -57,7 +57,8 @@ install_essential_packages() {
         wget gpg apt-transport-https curl build-essential \
         zip unzip unrar 7zip \
         vlc lame libdvd-pkg \
-        gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly
+        gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+        python3-pip python3-venv
         
     # Configura o libdvd-pkg de forma não interativa
     dpkg-reconfigure -fnoninteractive libdvd-pkg
