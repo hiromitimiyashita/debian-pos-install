@@ -48,13 +48,13 @@ install_dependencies() {
 install_neovim() {
     log_info "Instalando a versão mais recente do Neovim..."
     # Baixa a versão estável mais recente do AppImage
-    curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim.appimage
+    curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage
     
     # Dá permissão de execução
-    chmod +x nvim.appimage
+    chmod +x nvim-linux-x86_64.appimage
     
     # Move para um diretório no PATH do sistema e renomeia para 'nvim'
-    mv nvim.appimage /usr/local/bin/nvim
+    mv nvim-linux-x86_64.appimage /usr/local/bin/nvim
     
     log_success "Neovim instalado em /usr/local/bin/nvim."
 }
