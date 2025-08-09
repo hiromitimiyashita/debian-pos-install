@@ -9,9 +9,9 @@
 # usando o repositório oficial da Docker em sistemas baseados no Debian.
 #
 # USO:
-# 1. Salve este arquivo como 'setup-docker.sh'.
-# 2. Torne-o executável: chmod +x setup-docker.sh
-# 3. Execute com privilégios de superusuário: sudo ./setup-docker.sh
+# 1. Salve este arquivo como 'setup-docker'.
+# 2. Torne-o executável: chmod +x setup-docker
+# 3. Execute com privilégios de superusuário: sudo ./setup-docker
 #
 # ==============================================================================
 
