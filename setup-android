@@ -4,7 +4,7 @@
 # Script de Configuração do Ambiente de Desenvolvimento Android para Debian 13
 #
 # Autor: Equipe de Especialistas
-# Versão: 1.0
+# Versão: 1.2 (Limpo e Corrigido)
 #
 # Este script automatiza a instalação e configuração de um ambiente de
 # desenvolvimento Android profissional no Debian 13 "Trixie".
@@ -12,9 +12,9 @@
 # recente do Android Studio a partir do arquivo tarball oficial.
 #
 # USO:
-# 1. Salve este arquivo como 'setup-android-dev-debian13.sh'.
-# 2. Torne-o executável: chmod +x setup-android-dev-debian13.sh
-# 3. Execute com privilégios de superusuário: sudo./setup-android-dev-debian13.sh
+# 1. Salve este arquivo como 'setup-android-dev.sh'.
+# 2. Torne-o executável: chmod +x setup-android-dev.sh
+# 3. Execute com privilégios de superusuário: sudo ./setup-android-dev.sh
 #
 # AVISO: Este script fará alterações no sistema, incluindo a instalação
 # de pacotes e a modificação de arquivos de configuração do usuário.
@@ -24,23 +24,28 @@
 # Sai imediatamente se um comando falhar
 set -e
 
+# --- Funções de Log ---
 log_success() {
-    echo "--- SUCESSO: $1 concluído."
+    echo -e "\n\e[1;32m[SUCESSO] $1\e[0m"
 }
 
 log_error() {
-    echo "--- ERROR: $1 ocorrido."
+    echo -e "\n\e[1;31m[ERRO] $1\e[0m" >&2
 }
 
 log_warning() {
-    echo "--- ATENCAO: $1 ocorrido."
+    echo -e "\n\e[1;33m[AVISO] $1\e[0m"
 }
 
-# --- Funções de Utilidade ---
 log_info() {
    echo -e "\n\e[1;34m[INFO] $1\e[0m"
+}
 
-# 1. Verificar arquitetura do sistema
+# --- Verificações Iniciais ---
+check_prerequisites() {
+    log_info "Verificando pré-requisitos do sistema..."
+
+    # 1. Verificar arquitetura do sistema
     if [ "$(uname -m)" != "x86_64" ]; then
         log_error "O Android Studio requer uma arquitetura de sistema de 64 bits."
         exit 1
@@ -51,15 +56,15 @@ log_info() {
         log_error "O Android Studio requer uma arquitetura de sistema de 64 bits."
         exit 1
     fi
+    log_success "Arquitetura de 64 bits confirmada."
 
     # 3. Verificar suporte à virtualização por hardware (KVM)
     if ! egrep -q '(vmx|svm)' /proc/cpuinfo; then
-        log_warning "Suporte à virtualização por hardware \(Intel VT-x ou AMD-V\) não detectado."
+        log_warning "Suporte à virtualização por hardware (Intel VT-x ou AMD-V) não detectado."
         log_warning "O Emulador Android será extremamente lento. É altamente recomendável habilitar a virtualização na BIOS/UEFI do seu sistema."
     else
         log_success "Suporte à virtualização por hardware (KVM) detectado."
     fi
-
 }
 
 # --- Instalação de Dependências do Sistema ---
@@ -67,17 +72,14 @@ install_dependencies() {
     log_info "Atualizando a lista de pacotes e instalando dependências do sistema..."
     apt-get update
 
-    # 1. Instalar JDK 17, necessário para o Android Gradle Plugin 8.x+
     log_info "Instalando OpenJDK 17..."
     apt-get install -y openjdk-17-jdk
 
-    # 2. Instalar bibliotecas de 32-bit para compatibilidade com ferramentas legadas do SDK
     log_info "Adicionando arquitetura i386 e instalando bibliotecas de compatibilidade de 32 bits..."
     dpkg --add-architecture i386
     apt-get update
     apt-get install -y libc6:i386 libncurses6:i386 libstdc++6:i386 lib32z1 libbz2-1.0:i386
 
-    # 3. Instalar KVM e ferramentas de virtualização para emulação acelerada
     log_info "Instalando KVM, QEMU e ferramentas de gerenciamento de virtualização..."
     apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virt-manager
 }
@@ -86,27 +88,26 @@ install_dependencies() {
 install_android_studio() {
     log_info "Instalando o Android Studio..."
 
-    # URL de download para a versão mais recente do Linux.
-    # Esta URL é um link de redirecionamento fornecido pelo Google.
     STUDIO_URL="https://redirector.gvt1.com/edgedl/android/studio/ide-zips/2025.1.1.13/android-studio-2025.1.1.13-linux.tar.gz"
-    STUDIO_ARCHIVE="android-studio-linux.tar.gz"
+    STUDIO_ARCHIVE="/tmp/android-studio-linux.tar.gz"
     INSTALL_DIR="/opt"
-    STUDIO_DIR_NAME="android-studio" # Nome do diretório após a extração
+    STUDIO_DIR_NAME="android-studio"
 
     log_info "Baixando o Android Studio de $STUDIO_URL..."
-    # Usar curl para baixar o arquivo
     curl -L -o "$STUDIO_ARCHIVE" "$STUDIO_URL"
 
     log_info "Extraindo o Android Studio para $INSTALL_DIR..."
-    # Extrai o arquivo para o diretório de instalação
     tar -xzf "$STUDIO_ARCHIVE" -C "$INSTALL_DIR"
-    
+
     # Renomeia o diretório extraído para um nome genérico
-    EXTRACTED_DIR=$(tar -tzf "$STUDIO_ARCHIVE" | head -1 | cut -f1 -d"/")
-    if; then
-        mv "$INSTALL_DIR/$EXTRACTED_DIR" "$INSTALL_DIR/$STUDIO_DIR_NAME"
+    EXTRACTED_DIR_NAME=$(tar -tzf "$STUDIO_ARCHIVE" | head -1 | cut -f1 -d"/")
+    
+    if [ -d "$INSTALL_DIR/$EXTRACTED_DIR_NAME" ]; then
+        log_info "Renomeando '$INSTALL_DIR/$EXTRACTED_DIR_NAME' para '$INSTALL_DIR/$STUDIO_DIR_NAME'..."
+        mv "$INSTALL_DIR/$EXTRACTED_DIR_NAME" "$INSTALL_DIR/$STUDIO_DIR_NAME"
     else
-        log_error "Não foi possível encontrar o diretório extraído '$EXTRACTED_DIR'."
+        log_error "Não foi possível encontrar o diretório extraído '$EXTRACTED_DIR_NAME'."
+        exit 1
     fi
 
     log_info "Limpando o arquivo baixado..."
@@ -117,28 +118,25 @@ install_android_studio() {
 
 # --- Configuração do Ambiente do Usuário ---
 configure_environment() {
-    # Detectar o usuário que executou o sudo
-    if; then
-        TARGET_USER=$SUDO_USER
+    if [ -n "$SUDO_USER" ]; then
+        TARGET_USER="$SUDO_USER"
     else
         log_error "Este script deve ser executado com 'sudo'. Não foi possível determinar o usuário alvo."
+        exit 1
     fi
-    
+
     TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
 
     log_info "Configurando o ambiente para o usuário: $TARGET_USER..."
 
-    # 1. Adicionar o usuário aos grupos libvirt e kvm
     log_info "Adicionando o usuário $TARGET_USER aos grupos 'libvirt' e 'kvm'..."
     adduser "$TARGET_USER" libvirt
     adduser "$TARGET_USER" kvm
 
-    # 2. Configurar variáveis de ambiente no.bashrc
     BASHRC_FILE="$TARGET_HOME/.bashrc"
     log_info "Configurando variáveis de ambiente em $BASHRC_FILE..."
 
-    # Evitar adicionar as linhas se já existirem
-    if! grep -q "ANDROID_HOME" "$BASHRC_FILE"; then
+    if ! grep -q "ANDROID_HOME" "$BASHRC_FILE"; then
         echo '' >> "$BASHRC_FILE"
         echo '# Android SDK Environment Variables' >> "$BASHRC_FILE"
         echo 'export ANDROID_HOME=$HOME/Android/Sdk' >> "$BASHRC_FILE"
@@ -152,42 +150,39 @@ configure_environment() {
         log_warning "Variáveis de ambiente do Android SDK já parecem estar configuradas em $BASHRC_FILE. Pulando."
     fi
 
-    # 3. Criar o atalho de desktop (.desktop file)
     DESKTOP_ENTRY_DIR="$TARGET_HOME/.local/share/applications"
     mkdir -p "$DESKTOP_ENTRY_DIR"
     DESKTOP_FILE="$DESKTOP_ENTRY_DIR/android-studio.desktop"
-    
+
     log_info "Criando atalho de desktop em $DESKTOP_FILE..."
     cat > "$DESKTOP_FILE" <<EOL
-
+[Desktop Entry]
 Version=1.0
 Type=Application
 Name=Android Studio
 Comment=The Official IDE for Android
 Exec="/opt/android-studio/bin/studio.sh" %f
-Icon=/opt/android-studio/bin/studio.png
+Icon="/opt/android-studio/bin/studio.png"
 Categories=Development;IDE;
 Terminal=false
 StartupNotify=true
 StartupWMClass=jetbrains-studio
 EOL
 
-    # Definir permissões corretas para o usuário
     chown "$TARGET_USER":"$TARGET_USER" "$DESKTOP_FILE"
     chmod +x "$DESKTOP_FILE"
-    
+
     log_success "Atalho de desktop do Android Studio criado."
 }
 
 # --- Função Principal ---
 main() {
-    # Verificar se o script está sendo executado como root
-    if]; then
-       log_error "Este script precisa ser executado como root. Use 'sudo./setup-android-dev-debian13.sh'."
+    if [ "$(id -u)" -ne 0 ]; then
+       log_error "Este script precisa ser executado como root. Use 'sudo ./setup-android-dev.sh'."
+       exit 1
     fi
 
     log_info "Iniciando a configuração do Ambiente de Desenvolvimento Android no Debian 13."
-    
     check_prerequisites
     install_dependencies
     install_android_studio
@@ -196,10 +191,10 @@ main() {
     log_info "========================= CONFIGURAÇÃO CONCLUÍDA ========================="
     log_success "O ambiente de desenvolvimento Android foi instalado e configurado."
     log_info "Próximos Passos Manuais:"
-    echo "1. \e[1;33mFAÇA LOGOUT E LOGIN NOVAMENTE\e[0m para que as alterações de grupo (KVM/libvirt) tenham efeito."
+    echo "1. FAÇA LOGOUT E LOGIN NOVAMENTE para que as alterações de grupo (KVM/libvirt) tenham efeito."
     echo "2. Execute o Android Studio pela primeira vez a partir do menu de aplicativos."
     echo "3. Siga o Assistente de Configuração para baixar os componentes do SDK (geralmente em ~/Android/Sdk)."
-    echo "4. Para um desempenho ideal, considere aumentar o heap da JVM do IDE via 'Help > Edit Custom VM Options' após a primeira execução."
+    echo "4. Para um desempenho ideal, considere aumentar o heap da JVM do IDE via 'Help > Edit Custom VM Options'."
     echo "============================================================================"
 }
 
