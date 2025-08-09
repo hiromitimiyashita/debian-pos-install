@@ -38,17 +38,28 @@ log_warning() {
 
 # --- Funções de Utilidade ---
 log_info() {
-    echo -e "\n\e[1;34m[INFO]\e\e\e\e]; then
+   echo -e "\n\e[1;34m[INFO] $1\e[0m"
+
+# 1. Verificar arquitetura do sistema
+    if [ "$(uname -m)" != "x86_64" ]; then
         log_error "O Android Studio requer uma arquitetura de sistema de 64 bits."
+        exit 1
+    fi
+
+    # 2. Verificar se o sistema é 64-bit (redundante, mas bom pra garantir)
+    if ! getconf LONG_BIT | grep -q "64"; then
+        log_error "O Android Studio requer uma arquitetura de sistema de 64 bits."
+        exit 1
     fi
 
     # 3. Verificar suporte à virtualização por hardware (KVM)
-    if! egrep -q '(vmx|svm)' /proc/cpuinfo; then
-        log_warning "Suporte à virtualização por hardware (Intel VT-x ou AMD-V) não detectado."
+    if ! egrep -q '(vmx|svm)' /proc/cpuinfo; then
+        log_warning "Suporte à virtualização por hardware \(Intel VT-x ou AMD-V\) não detectado."
         log_warning "O Emulador Android será extremamente lento. É altamente recomendável habilitar a virtualização na BIOS/UEFI do seu sistema."
     else
         log_success "Suporte à virtualização por hardware (KVM) detectado."
     fi
+
 }
 
 # --- Instalação de Dependências do Sistema ---
