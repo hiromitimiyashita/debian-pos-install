@@ -111,12 +111,12 @@ main() {
     log_info "========================= INSTALAÇÃO CONCLUÍDA ========================="
     log_success "O Docker foi instalado e configurado com sucesso."
     log_info "Próximos Passos:"
-    echo "1. \e[1;33mFAÇA LOGOUT E LOGIN NOVAMENTE\e[0m no seu usuário para usar o Docker sem 'sudo'."
+    echo "1. \e[1;34mFAÇA LOGOUT E LOGIN NOVAMENTE\e[0m no seu usuário para usar o Docker sem 'sudo'."
     echo "   (Como alternativa, rode 'newgrp docker' no seu terminal atual para aplicar as mudanças de grupo)"
     echo "2. Após o novo login, teste a instalação com o comando: docker run hello-world"
     echo "3. Para usar o Compose, o comando é: docker compose up (sem o hífen)"
     echo "============================================================================"
 }
-
+"\n\e[1;34m[INFO] $1\e[0m"
 # --- Ponto de Entrada do Script ---
 main
