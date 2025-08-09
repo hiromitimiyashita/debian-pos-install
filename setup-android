@@ -100,15 +100,15 @@ install_android_studio() {
     tar -xzf "$STUDIO_ARCHIVE" -C "$INSTALL_DIR"
 
     # Renomeia o diretório extraído para um nome genérico
-    EXTRACTED_DIR_NAME=$(tar -tzf "$STUDIO_ARCHIVE" | head -1 | cut -f1 -d"/")
+    #EXTRACTED_DIR_NAME=$(tar -tzf "$STUDIO_ARCHIVE" | head -1 | cut -f1 -d"/")
     
-    if [ -d "$INSTALL_DIR/$EXTRACTED_DIR_NAME" ]; then
-        log_info "Renomeando '$INSTALL_DIR/$EXTRACTED_DIR_NAME' para '$INSTALL_DIR/$STUDIO_DIR_NAME'..."
-        mv "$INSTALL_DIR/$EXTRACTED_DIR_NAME" "$INSTALL_DIR/$STUDIO_DIR_NAME"
-    else
-        log_error "Não foi possível encontrar o diretório extraído '$EXTRACTED_DIR_NAME'."
-        exit 1
-    fi
+    #if [ -d "$INSTALL_DIR/$EXTRACTED_DIR_NAME" ]; then
+    #    log_info "Renomeando '$INSTALL_DIR/$EXTRACTED_DIR_NAME' para '$INSTALL_DIR/$STUDIO_DIR_NAME'..."
+    #    mv "$INSTALL_DIR/$EXTRACTED_DIR_NAME" "$INSTALL_DIR/$STUDIO_DIR_NAME"
+    #else
+    #    log_error "Não foi possível encontrar o diretório extraído '$EXTRACTED_DIR_NAME'."
+    #    exit 1
+    #fi
 
     log_info "Limpando o arquivo baixado..."
     rm "$STUDIO_ARCHIVE"
