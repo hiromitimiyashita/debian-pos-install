@@ -1,0 +1,270 @@
+#!/bin/bash
+# ==============================================================================
+# Script Unificado de Pós-Instalação para Debian
+#
+#
+# Este script automatiza a instalação e configuração de um ambiente completo,
+# incluindo um sistema base, Docker, Android Studio e Neovim com LazyVim.
+#
+# USO:
+# Execute com privilégios de sudo: sudo ./general-setup
+# ==============================================================================
+
+# --- Configuração de Robustez ---
+set -e
+trap 'error_handler $? $LINENO' ERR
+
+# --- Funções Globais de Log e Erro ---
+log_step() { echo -e "\n\e[1;35m>>> PASSO: $1\e[0m"; }
+log_success() { echo -e "\e[1;32m[SUCESSO] $1\e[0m"; }
+log_error() { echo -e "\e[1;31m[ERRO] $1\e[0m" >&2; }
+log_info() { echo -e "\e[1;34m[INFO] $1\e[0m"; }
+log_warning() { echo -e "\e[1;33m[AVISO] $1\e[0m"; }
+
+error_handler() {
+    log_error "Ocorreu um erro na linha $2. Código de saída: $1."
+    exit 1
+}
+
+# ==============================================================================
+# MÓDULO 1: SISTEMA BASE E FERRAMENTAS ESSENCIAIS
+# (Combina debian-pos-install e dependências de outros scripts)
+# ==============================================================================
+run_base_install() {
+    log_step "Iniciando Instalação do Sistema Base e Ferramentas Essenciais"
+
+    log_info "Configurando repositórios APT (contrib, non-free)..."
+    cp /etc/apt/sources.list /etc/apt/sources.list.bak
+    sed -i 's/ main$/ main contrib non-free non-free-firmware/' /etc/apt/sources.list
+    
+    log_info "Adicionando arquitetura i386 para compatibilidade..."
+    dpkg --add-architecture i386
+    apt update
+
+    log_info "Instalando todos os pacotes essenciais e dependências..."
+    # Lista unificada de dependências de todos os scripts
+    apt install -y \
+        sudo wget gpg apt-transport-https curl build-essential ca-certificates gnupg \
+        zip unzip unrar p7zip-full lame libdvd-pkg \
+        gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+        python3-pip python3-venv \
+        ripgrep fd-find \
+        libc6:i386 libncurses6:i386 libstdc++6:i386 lib32z1 libbz2-1.0:i386 \
+        qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virt-manager
+
+    dpkg-reconfigure -fnoninteractive libdvd-pkg
+
+    log_info "Adicionando repositórios de softwares (Chrome, VSCode, Node.js)..."
+    # Google Chrome
+    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome-keyring.gpg
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
+    # VS Code
+    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /usr/share/keyrings/microsoft-archive-keyring.gpg
+    echo "deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/microsoft-archive-keyring.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list
+    
+    log_info "Baixando script de setup do Node.js LTS..."
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+    
+    log_info "Atualizando APT e instalando softwares..."
+    apt update
+    apt install -y google-chrome-stable code nodejs
+    
+    log_success "Sistema Base e Ferramentas Essenciais instalados."
+}
+
+# ==============================================================================
+# MÓDULO 2: AMBIENTE DE DESENVOLVIMENTO ANDROID
+# ==============================================================================
+run_android_install() {
+    log_step "Iniciando Instalação do Ambiente Android"
+    local TARGET_USER=${SUDO_USER:-$(logname)}
+    local TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+
+    log_info "Verificando pré-requisitos de hardware..."
+    if ! egrep -q '(vmx|svm)' /proc/cpuinfo; then
+        log_warning "Suporte à virtualização por hardware (KVM) não detectado. O emulador será lento."
+    else
+        log_success "Suporte à virtualização (KVM) detectado."
+    fi
+
+    log_info "Instalando OpenJDK 25..."
+    apt install -y openjdk-25-jdk
+
+    log_info "Instalando Android Studio..."
+    local STUDIO_URL="https://redirector.gvt1.com/edgedl/android/studio/ide-zips/2025.1.1.13/android-studio-2025.1.1.13-linux.tar.gz"
+    local STUDIO_ARCHIVE="/tmp/android-studio.tar.gz"
+    local INSTALL_DIR="/opt"
+    curl -L -o "$STUDIO_ARCHIVE" "$STUDIO_URL"
+    tar -xzf "$STUDIO_ARCHIVE" -C "$INSTALL_DIR"
+    rm "$STUDIO_ARCHIVE"
+
+    log_info "Configurando ambiente para o usuário '$TARGET_USER'..."
+    adduser "$TARGET_USER" libvirt
+    adduser "$TARGET_USER" kvm
+
+    local BASHRC_FILE="$TARGET_HOME/.bashrc"
+    if ! grep -q "ANDROID_HOME" "$BASHRC_FILE"; then
+        echo -e '\n# Android SDK Environment Variables\nexport ANDROID_HOME=$HOME/Android/Sdk\nexport PATH=$PATH:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools' >> "$BASHRC_FILE"
+    fi
+
+    local DESKTOP_FILE="$TARGET_HOME/.local/share/applications/android-studio.desktop"
+    mkdir -p "$(dirname "$DESKTOP_FILE")"
+    cat > "$DESKTOP_FILE" <<EOL
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Android Studio
+Exec="/opt/android-studio/bin/studio.sh" %f
+Icon=/opt/android-studio/bin/studio.svg
+Categories=Development;IDE;
+Terminal=false
+EOL
+    chown "$TARGET_USER":"$TARGET_USER" "$DESKTOP_FILE"
+    chmod +x "$DESKTOP_FILE"
+
+    log_success "Ambiente Android instalado. Faça logout/login para aplicar permissões de grupo."
+}
+
+# ==============================================================================
+# MÓDULO 3: DOCKER ENGINE E DOCKER COMPOSE
+# ==============================================================================
+run_docker_install() {
+    log_step "Iniciando Instalação do Docker"
+    local TARGET_USER=${SUDO_USER:-$(logname)}
+
+    log_info "Removendo versões antigas do Docker (se existirem)..."
+    apt remove -y docker docker-engine docker.io containerd runc || true
+
+    log_info "Configurando o repositório oficial do Docker..."
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+    log_info "Instalando Docker Engine..."
+    apt-get update
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+    log_info "Adicionando usuário '$TARGET_USER' ao grupo docker..."
+    usermod -aG docker "$TARGET_USER"
+
+    log_success "Docker instalado. Faça logout/login para usar sem 'sudo'."
+}
+
+# ==============================================================================
+# MÓDULO 4: NEOVIM COM LAZYVIM
+# ==============================================================================
+run_neovim_install() {
+    log_step "Iniciando Instalação do Neovim com LazyVim"
+    local TARGET_USER=${SUDO_USER:-$(logname)}
+    local TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+
+    log_info "Instalando a versão mais recente do Neovim..."
+    curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage
+    chmod +x nvim-linux-x86_64.appimage
+    mv nvim-linux-x86_64.appimage /usr/local/bin/nvim
+
+    log_info "Baixando FiraCode Nerd Font..."
+    local FONT_DIR="$TARGET_HOME/.local/share/fonts"
+    mkdir -p "$FONT_DIR"
+    curl -fLo "/tmp/FiraCode.zip" "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/FiraCode.zip"
+    unzip -o "/tmp/FiraCode.zip" -d "$FONT_DIR"
+    rm "/tmp/FiraCode.zip"
+    chown -R "$TARGET_USER":"$TARGET_USER" "$TARGET_HOME/.local"
+    fc-cache -fv
+
+    log_info "Instalando LazyVim para o usuário '$TARGET_USER'..."
+    local NVIM_CONFIG_DIR="$TARGET_HOME/.config/nvim"
+    [ -d "$NVIM_CONFIG_DIR" ] && mv "$NVIM_CONFIG_DIR" "$NVIM_CONFIG_DIR.bak.$(date +%s)"
+    sudo -u "$TARGET_USER" git clone https://github.com/LazyVim/starter "$NVIM_CONFIG_DIR"
+    rm -rf "$NVIM_CONFIG_DIR/.git"
+
+    log_success "Neovim e LazyVim instalados."
+}
+
+# ==============================================================================
+# FUNÇÃO PRINCIPAL E MENU
+# ==============================================================================
+show_menu() {
+    clear
+    echo -e "\e[1;36m"
+    echo "================================================="
+    echo "    SCRIPT DE PÓS-INSTALAÇÃO UNIFICADO (DEBIAN)    "
+    echo "================================================="
+    echo -e "\e[0m"
+    echo "Escolha os componentes que deseja instalar:"
+    echo ""
+    echo -e "  \e[1;32m[1]\e[0m Sistema Base e Ferramentas (Chrome, VSCode, Node.js, etc.)"
+    echo -e "  \e[1;32m[2]\e[0m Ambiente de Desenvolvimento Android (Android Studio, JDK)"
+    echo -e "  \e[1;32m[3]\e[0m Docker e Docker Compose"
+    echo -e "  \e[1;32m[4]\e[0m Neovim com Configuração LazyVim"
+    echo ""
+    echo -e "  \e[1;33m[A]\e[0m Instalar TUDO (1, 2, 3, 4)"
+    echo -e "  \e[1;31m[S]\e[0m Sair"
+    echo ""
+    read -p "Digite suas escolhas (ex: 1,3,4): " choices
+}
+
+main() {
+    if [ "$(id -u)" -ne 0 ]; then
+        log_error "Este script precisa ser executado como root. Use 'sudo ./setup-geral.sh'"
+        exit 1
+    fi
+    
+    local final_actions=""
+
+    show_menu
+    
+    # Converte para minúsculas
+    choices=$(echo "$choices" | tr '[:upper:]' '[:lower:]')
+
+    if [[ "$choices" =~ "s" ]]; then
+        log_info "Saindo do script."
+        exit 0
+    fi
+
+    if [[ "$choices" =~ "a" ]]; then
+        choices="1,2,3,4"
+    fi
+
+    # Garante que a base seja instalada se qualquer outro componente for escolhido
+    if [[ "$choices" =~ "2" || "$choices" =~ "3" || "$choices" =~ "4" ]] && [[ ! "$choices" =~ "1" ]]; then
+        log_warning "A opção [1] Sistema Base é necessária para as outras e será instalada."
+        choices="1,$choices"
+    fi
+
+    # Executa as instalações baseadas na escolha
+    if [[ "$choices" =~ "1" ]]; then
+        run_base_install
+        final_actions+="\n- VSCode, Chrome e Node.js foram instalados."
+    fi
+    if [[ "$choices" =~ "2" ]]; then
+        run_android_install
+        final_actions+="\n- Android Studio: Faça logout e login para usar o KVM. Abra o Studio para o setup inicial."
+    fi
+    if [[ "$choices" =~ "3" ]]; then
+        run_docker_install
+        final_actions+="\n- Docker: Faça logout e login para usar 'docker' sem 'sudo'."
+    fi
+    if [[ "$choices" =~ "4" ]]; then
+        run_neovim_install
+        final_actions+="\n- Neovim: Configure a fonte do seu terminal para 'FiraCode Nerd Font' e rode 'nvim'."
+    fi
+
+    log_info "Limpando pacotes desnecessários..."
+    apt-get autoremove -y
+    apt-get clean
+
+    # --- Mensagem Final ---
+    log_step "INSTALAÇÃO CONCLUÍDA"
+    if [ -z "$final_actions" ]; then
+        log_warning "Nenhuma opção de instalação foi selecionada."
+    else
+        log_success "Os componentes selecionados foram instalados!"
+        log_info "PRÓXIMOS PASSOS E AÇÕES NECESSÁRIAS:"
+        echo -e "$final_actions"
+        log_warning "\nÉ altamente recomendável REINICIAR o sistema para que todas as alterações tenham efeito."
+    fi
+}
+
+main
