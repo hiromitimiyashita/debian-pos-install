@@ -3,9 +3,6 @@
 # ==============================================================================
 # Script de Configuração do Ambiente de Desenvolvimento Android para Debian 13
 #
-# Autor: Equipe de Especialistas
-# Versão: 1.2 (Limpo e Corrigido)
-#
 # Este script automatiza a instalação e configuração de um ambiente de
 # desenvolvimento Android profissional no Debian 13 "Trixie".
 # Ele instala o JDK, KVM, as dependências necessárias e a versão mais
@@ -162,7 +159,7 @@ Type=Application
 Name=Android Studio
 Comment=The Official IDE for Android
 Exec="/opt/android-studio/bin/studio.sh" %f
-Icon="/opt/android-studio/bin/studio.png"
+Icon="/opt/android-studio/bin/studio.svg"
 Categories=Development;IDE;
 Terminal=false
 StartupNotify=true
@@ -178,7 +175,7 @@ EOL
 # --- Função Principal ---
 main() {
     if [ "$(id -u)" -ne 0 ]; then
-       log_error "Este script precisa ser executado como root. Use 'sudo ./setup-android-dev.sh'."
+       log_error "Este script precisa ser executado como root. Use 'sudo ./setup-android."
        exit 1
     fi
 
