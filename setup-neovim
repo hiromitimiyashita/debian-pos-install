@@ -73,7 +73,7 @@ install_nerd_font() {
     mkdir -p "$FONT_DIR"
     
     # URL da fonte FiraCode Nerd Font (verifique por versões mais novas se desejar)
-    FONT_URL="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/FiraCode.zip"
+    FONT_URL="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/FiraCode.zip"
     FONT_ZIP_PATH="/tmp/FiraCode.zip"
 
     curl -L "$FONT_URL" -o "$FONT_ZIP_PATH"
