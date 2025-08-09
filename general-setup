@@ -35,7 +35,17 @@ run_base_install() {
 
     log_info "Configurando repositórios APT (contrib, non-free)..."
     cp /etc/apt/sources.list /etc/apt/sources.list.bak
-    sed -i 's/ main$/ main contrib non-free non-free-firmware/' /etc/apt/sources.list
+
+# Esta é a forma robusta de adicionar os componentes ao sources.list.
+    # Itera sobre cada componente e o adiciona se ele não existir na linha do repositório.
+    local components=("contrib" "non-free" "non-free-firmware")
+    for comp in "${components[@]}"; do
+        log_info "Verificando e adicionando o componente: ${comp}..."
+        # Adiciona o componente às linhas que começam com "deb " e não possuem o componente.
+        sed -i "/^deb / { /${comp}/! s/$/ ${comp}/ }" /etc/apt/sources.list
+    done
+
+   
     
     log_info "Adicionando arquitetura i386 para compatibilidade..."
     dpkg --add-architecture i386
