@@ -1,0 +1,123 @@
+#!/bin/bash
+# Script de Configuração Pós-Instalação para Debian
+# Este script automatiza a instalação de ferramentas essenciais de sistema,
+# desktop, multimídia e desenvolvimento.
+#
+# Execute como root ou com privilégios de sudo:
+# sudo ./setup_script.sh
+
+# Sai imediatamente se um comando falhar.
+set -e
+
+# --- Funções de Feedback ---
+log_step() {
+    echo "======================================================================="
+    echo ">>> PASSO: $1"
+    echo "======================================================================="
+}
+
+log_success() {
+    echo "--- SUCESSO: $1 concluído."
+}
+
+# --- Funções de Instalação ---
+configure_apt_repositories() {
+    log_step "Configurando repositórios APT (contrib, non-free, non-free-firmware)"
+    # Faz backup do sources.list original
+    cp /etc/apt/sources.list /etc/apt/sources.list.bak
+    # Adiciona componentes non-free
+    sed -i 's/ main$/ main contrib non-free non-free-firmware/' /etc/apt/sources.list
+    apt update
+    log_success "Repositórios APT"
+}
+
+install_sudo_and_configure_user() {
+    log_step "Instalando e configurando o sudo"
+    if ! command -v sudo &> /dev/null; then
+        echo "O comando 'sudo' não foi encontrado. Instalando..."
+        su -c "apt install -y sudo"
+    else
+        echo "O 'sudo' já está instalado."
+    fi
+    
+    CURRENT_USER=$(logname)
+    if groups "$CURRENT_USER" | grep -q '\bsudo\b'; then
+        echo "O usuário '$CURRENT_USER' já pertence ao grupo 'sudo'."
+    else
+        echo "Adicionando o usuário '$CURRENT_USER' ao grupo 'sudo'..."
+        su -c "adduser $CURRENT_USER sudo"
+        echo "IMPORTANTE: O usuário deve fazer logout e login novamente para que as permissões de sudo entrem em vigor."
+    fi
+    log_success "Configuração do sudo"
+}
+
+install_essential_packages() {
+    log_step "Instalando pacotes essenciais e utilitários de compressão"
+    apt install -y \
+        wget gpg apt-transport-https curl build-essential \
+        zip unzip unrar 7zip \
+        vlc lame libdvd-pkg \
+        gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly
+        
+    # Configura o libdvd-pkg de forma não interativa
+    dpkg-reconfigure -fnoninteractive libdvd-pkg
+    log_success "Pacotes essenciais"
+}
+
+install_google_chrome() {
+    log_step "Instalando o Google Chrome"
+    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome-keyring.gpg
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
+    apt update
+    apt install -y google-chrome-stable
+    log_success "Google Chrome"
+}
+
+install_vscode() {
+    log_step "Instalando o Visual Studio Code"
+    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /usr/share/keyrings/microsoft-archive-keyring.gpg
+    echo "deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/microsoft-archive-keyring.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list
+    apt update
+    apt install -y code
+    log_success "Visual Studio Code"
+}
+
+install_nodejs_lts() {
+    log_step "Instalando o Node.js (versão LTS) via NodeSource"
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+    apt-get install -y nodejs
+    log_success "Node.js LTS"
+}
+
+# --- Função Principal ---
+main() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "Este script precisa ser executado como root ou com privilégios de sudo."
+        echo "Exemplo: sudo ./setup_script.sh"
+        exit 1
+    fi
+
+    configure_apt_repositories
+    install_sudo_and_configure_user
+    install_essential_packages
+    install_google_chrome
+    install_vscode
+    install_nodejs_lts
+
+    echo ""
+    echo "======================================================================="
+    echo "      INSTALAÇÃO CONCLUÍDA COM SUCESSO!      "
+    echo "======================================================================="
+    echo "AÇÕES NECESSÁRIAS:"
+    echo "1. **REINICIE** o sistema para garantir que todas as alterações, especialmente"
+    echo "   as permissões do 'sudo', sejam aplicadas corretamente."
+    echo "2. Após reiniciar, verifique as instalações com os comandos:"
+    echo "   - google-chrome-stable --version"
+    echo "   - code --version"
+    echo "   - node -v"
+    echo "   - npm -v"
+    echo "======================================================================="
+}
+
+# Executa a função principal
+main
