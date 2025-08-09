@@ -72,7 +72,7 @@ install_dependencies() {
     log_info "Atualizando a lista de pacotes e instalando dependências do sistema..."
     apt update
 
-    log_info "Instalando OpenJDK 17..."
+    log_info "Instalando OpenJDK 25..."
     apt install -y openjdk-25-jdk
 
     log_info "Adicionando arquitetura i386 e instalando bibliotecas de compatibilidade de 32 bits..."
