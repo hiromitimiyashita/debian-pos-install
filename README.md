@@ -1,4 +1,4 @@
-# Guia Definitivo para Automação Pós-Instalação do Debian: Um Script Abrangente
+# Guia Definitivo para Automação Pós-Instalação do Debian
 
 ## Introdução: Automatizando Sua Estação de Trabalho Debian
 
