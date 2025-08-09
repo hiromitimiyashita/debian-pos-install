@@ -1,0 +1,153 @@
+#!/bin/bash
+
+# ==============================================================================
+# Script de Instalação do Neovim com LazyVim para Debian/Ubuntu
+#
+# Versão: 1.0
+#
+# Este script automatiza a instalação do Neovim (versão mais recente) e da
+# configuração LazyVim, incluindo dependências e uma Nerd Font.
+#
+# USO:
+# 1. Salve este arquivo como 'setup-neovim'.
+# 2. Torne-o executável: chmod +x setup-neovim
+# 3. Execute com privilégios de superusuário: sudo ./setup-neovim
+#
+# ==============================================================================
+
+# Sai imediatamente se um comando falhar
+set -e
+
+# --- Funções de Log ---
+log_success() {
+    echo -e "\n\e[1;32m[SUCESSO] $1\e[0m"
+}
+
+log_error() {
+    echo -e "\n\e[1;31m[ERRO] $1\e[0m" >&2
+}
+
+log_info() {
+   echo -e "\n\e[1;34m[INFO] $1\e[0m"
+}
+
+# --- Instalação de Dependências ---
+install_dependencies() {
+    log_info "Instalando dependências essenciais..."
+    apt-get update
+    # build-essential: para compilar plugins (ex: tree-sitter)
+    # git: para o lazy.nvim e plugins
+    # curl/wget: para baixar arquivos
+    # unzip: para descompactar fontes
+    # ripgrep, fd-find: para o Telescope (busca de arquivos)
+    apt-get install -y build-essential git curl wget unzip ripgrep fd-find
+    log_success "Dependências instaladas."
+}
+
+# --- Instalação do Neovim ---
+install_neovim() {
+    log_info "Instalando a versão mais recente do Neovim..."
+    # Baixa a versão estável mais recente do AppImage
+    curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim.appimage
+    
+    # Dá permissão de execução
+    chmod +x nvim.appimage
+    
+    # Move para um diretório no PATH do sistema e renomeia para 'nvim'
+    mv nvim.appimage /usr/local/bin/nvim
+    
+    log_success "Neovim instalado em /usr/local/bin/nvim."
+}
+
+# --- Download e Preparação da Nerd Font ---
+install_nerd_font() {
+    if [ -z "$SUDO_USER" ]; then
+        log_error "A variável \$SUDO_USER não está definida. Execute o script com 'sudo'."
+        exit 1
+    fi
+    
+    TARGET_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    FONT_DIR="$TARGET_HOME/.local/share/fonts"
+
+    log_info "Baixando FiraCode Nerd Font para o usuário $SUDO_USER..."
+    mkdir -p "$FONT_DIR"
+    
+    # URL da fonte FiraCode Nerd Font (verifique por versões mais novas se desejar)
+    FONT_URL="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/FiraCode.zip"
+    FONT_ZIP_PATH="/tmp/FiraCode.zip"
+
+    curl -L "$FONT_URL" -o "$FONT_ZIP_PATH"
+    unzip -o "$FONT_ZIP_PATH" -d "$FONT_DIR"
+    rm "$FONT_ZIP_PATH"
+
+    # Define as permissões corretas para o usuário
+    chown -R "$SUDO_USER":"$SUDO_USER" "$TARGET_HOME/.local"
+    
+    # Atualiza o cache de fontes do sistema
+    fc-cache -fv
+    
+    log_success "FiraCode Nerd Font baixada."
+}
+
+
+# --- Instalação da configuração LazyVim ---
+install_lazyvim() {
+    if [ -z "$SUDO_USER" ]; then
+        log_error "A variável \$SUDO_USER não está definida. Execute o script com 'sudo'."
+        exit 1
+    fi
+
+    TARGET_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    NVIM_CONFIG_DIR="$TARGET_HOME/.config/nvim"
+    NVIM_DATA_DIR="$TARGET_HOME/.local/share/nvim"
+
+    log_info "Fazendo backup de configurações existentes do Neovim..."
+    # Adiciona um timestamp ao backup para não sobrescrever backups antigos
+    TIMESTAMP=$(date +%s)
+    [ -d "$NVIM_CONFIG_DIR" ] && mv "$NVIM_CONFIG_DIR" "$NVIM_CONFIG_DIR.bak.$TIMESTAMP"
+    [ -d "$NVIM_DATA_DIR" ] && mv "$NVIM_DATA_DIR" "$NVIM_DATA_DIR.bak.$TIMESTAMP"
+    log_success "Backup concluído (se existia configuração)."
+
+    log_info "Clonando o template do LazyVim..."
+    # Clona como o usuário alvo para evitar problemas de permissão
+    sudo -u "$SUDO_USER" git clone https://github.com/LazyVim/starter "$NVIM_CONFIG_DIR"
+
+    log_info "Removendo o diretório .git para você iniciar seu próprio versionamento..."
+    rm -rf "$NVIM_CONFIG_DIR/.git"
+
+    log_success "LazyVim instalado com sucesso!"
+}
+
+
+# --- Função Principal ---
+main() {
+    if [ "$(id -u)" -ne 0 ]; then
+       log_error "Este script precisa ser executado como root. Use 'sudo ./setup-neovim.sh'."
+       exit 1
+    fi
+    
+    log_info "Iniciando a configuração do ambiente Neovim + LazyVim..."
+    
+    install_dependencies
+    install_neovim
+    install_nerd_font
+    install_lazyvim
+
+    log_info "========================= CONFIGURAÇÃO CONCLUÍDA ========================="
+    log_success "Neovim e LazyVim foram instalados."
+    echo -e "\n\e[1;33mPASSOS FINAIS E IMPORTANTES:\e[0m"
+    echo "1. \e[1;33mConfigure a fonte do seu terminal:\e[0m"
+    echo "   - Abra as configurações do seu emulador de terminal (Gnome Terminal, Konsole, etc)."
+    echo "   - Mude a fonte para 'FiraCode Nerd Font' ou similar. \e[1;31mESTE PASSO É CRUCIAL!\e[0m"
+    echo ""
+    echo "2. \e[1;33mInicie o Neovim:\e[0m"
+    echo "   - Apenas digite 'nvim' no seu terminal."
+    echo "   - Na primeira vez, o LazyVim irá baixar e instalar todos os plugins. Aguarde a conclusão (pode levar alguns minutos)."
+    echo ""
+    echo "3. \e[1;33mExplore!\e[0m"
+    echo "   - Após a instalação, use a tecla 'Espaço' para ver os atalhos disponíveis."
+    echo "============================================================================"
+}
+
+# --- Ponto de Entrada do Script ---
+main
