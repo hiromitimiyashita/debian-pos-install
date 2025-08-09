@@ -1,0 +1,122 @@
+#!/bin/bash
+
+# ==============================================================================
+# Script de Instalação e Configuração do Docker para Debian/Ubuntu
+#
+# Versão: 1.0
+#
+# Este script automatiza a instalação do Docker Engine e Docker Compose
+# usando o repositório oficial da Docker em sistemas baseados no Debian.
+#
+# USO:
+# 1. Salve este arquivo como 'setup-docker.sh'.
+# 2. Torne-o executável: chmod +x setup-docker.sh
+# 3. Execute com privilégios de superusuário: sudo ./setup-docker.sh
+#
+# ==============================================================================
+
+# Sai imediatamente se um comando falhar
+set -e
+
+# --- Funções de Log ---
+log_success() {
+    echo -e "\n\e[1;32m[SUCESSO] $1\e[0m"
+}
+
+log_error() {
+    echo -e "\n\e[1;31m[ERRO] $1\e[0m" >&2
+}
+
+log_info() {
+   echo -e "\n\e[1;34m[INFO] $1\e[0m"
+}
+
+# --- Função de desinstalação de versões antigas ---
+uninstall_old_versions() {
+    log_info "Removendo versões antigas do Docker (se existirem)..."
+    # O comando continua mesmo se os pacotes não forem encontrados
+    apt-get remove -y docker docker-engine docker.io containerd runc || true
+    log_success "Versões antigas do Docker removidas."
+}
+
+# --- Função para configurar o repositório Docker ---
+setup_docker_repo() {
+    log_info "Configurando o repositório oficial do Docker..."
+    
+    # 1. Instalar pacotes de pré-requisito
+    apt-get update
+    apt-get install -y ca-certificates curl gnupg
+    
+    # 2. Adicionar a chave GPG oficial do Docker
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+
+    # 3. Adicionar o repositório ao Apt
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+      tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+    # 4. Atualizar a lista de pacotes com o novo repositório
+    apt-get update
+    log_success "Repositório do Docker configurado."
+}
+
+# --- Função para instalar o Docker Engine e Compose ---
+install_docker_engine() {
+    log_info "Instalando Docker Engine, CLI e Compose..."
+    # Instala a versão mais recente
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    log_success "Docker Engine e plugins instalados."
+}
+
+# --- Função para configurar o ambiente pós-instalação ---
+configure_post_install() {
+    log_info "Executando configurações pós-instalação..."
+    
+    if [ -z "$SUDO_USER" ]; then
+        log_error "A variável \$SUDO_USER não está definida. Execute o script com 'sudo'."
+        exit 1
+    fi
+
+    # 1. Criar o grupo 'docker' (se não existir)
+    if ! getent group docker > /dev/null; then
+        groupadd docker
+        log_info "Grupo 'docker' criado."
+    fi
+
+    # 2. Adicionar o usuário ao grupo 'docker'
+    log_info "Adicionando o usuário '$SUDO_USER' ao grupo 'docker'..."
+    usermod -aG docker "$SUDO_USER"
+    
+    log_success "Usuário '$SUDO_USER' adicionado ao grupo 'docker'."
+}
+
+# --- Função Principal ---
+main() {
+    # Verificar se o script está sendo executado como root
+    if [ "$(id -u)" -ne 0 ]; then
+       log_error "Este script precisa ser executado como root. Use 'sudo ./setup-docker.sh'."
+       exit 1
+    fi
+
+    log_info "Iniciando a instalação do Docker..."
+    
+    uninstall_old_versions
+    setup_docker_repo
+    install_docker_engine
+    configure_post_install
+
+    log_info "========================= INSTALAÇÃO CONCLUÍDA ========================="
+    log_success "O Docker foi instalado e configurado com sucesso."
+    log_info "Próximos Passos:"
+    echo "1. \e[1;33mFAÇA LOGOUT E LOGIN NOVAMENTE\e[0m no seu usuário para usar o Docker sem 'sudo'."
+    echo "   (Como alternativa, rode 'newgrp docker' no seu terminal atual para aplicar as mudanças de grupo)"
+    echo "2. Após o novo login, teste a instalação com o comando: docker run hello-world"
+    echo "3. Para usar o Compose, o comando é: docker compose up (sem o hífen)"
+    echo "============================================================================"
+}
+
+# --- Ponto de Entrada do Script ---
+main
