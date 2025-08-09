@@ -2,14 +2,11 @@
 # ==============================================================================
 # Script Pós-Instalação Modernizado para Debian
 #
-# Autor: Equipe de Especialistas (Revisado)
-# Versão: 2.0
-#
 # Este script automatiza a instalação de ferramentas essenciais de sistema,
 # desktop, multimídia e desenvolvimento com feedback aprimorado.
 #
 # USO:
-# Execute com privilégios de sudo: sudo ./setup_script.sh
+# Execute com privilégios de sudo: sudo ./install
 # ==============================================================================
 
 # --- Configuração de Robustez ---
