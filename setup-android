@@ -70,18 +70,18 @@ check_prerequisites() {
 # --- Instalação de Dependências do Sistema ---
 install_dependencies() {
     log_info "Atualizando a lista de pacotes e instalando dependências do sistema..."
-    apt-get update
+    apt update
 
     log_info "Instalando OpenJDK 17..."
-    apt-get install -y openjdk-17-jdk
+    apt install -y openjdk-25-jdk
 
     log_info "Adicionando arquitetura i386 e instalando bibliotecas de compatibilidade de 32 bits..."
     dpkg --add-architecture i386
-    apt-get update
-    apt-get install -y libc6:i386 libncurses6:i386 libstdc++6:i386 lib32z1 libbz2-1.0:i386
+    apt update
+    apt install -y libc6:i386 libncurses6:i386 libstdc++6:i386 lib32z1 libbz2-1.0:i386
 
     log_info "Instalando KVM, QEMU e ferramentas de gerenciamento de virtualização..."
-    apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virt-manager
+    apt install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virt-manager
 }
 
 # --- Instalação do Android Studio ---
