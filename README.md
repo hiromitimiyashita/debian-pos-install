@@ -1,5 +1,3 @@
-Sem problemas, aqui está o relatório formatado em Markdown, perfeito para um `README.md` no GitHub.
-
 # Guia Definitivo para Automação Pós-Instalação do Debian: Um Script Abrangente
 
 ## Introdução: Automatizando Sua Estação de Trabalho Debian
