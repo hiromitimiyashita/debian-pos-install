@@ -34,13 +34,13 @@ log_info() {
 # --- Instalação de Dependências ---
 install_dependencies() {
     log_info "Instalando dependências essenciais..."
-    apt-get update
+    apt update
     # build-essential: para compilar plugins (ex: tree-sitter)
     # git: para o lazy.nvim e plugins
     # curl/wget: para baixar arquivos
     # unzip: para descompactar fontes
     # ripgrep, fd-find: para o Telescope (busca de arquivos)
-    apt-get install -y build-essential git curl wget unzip ripgrep fd-find
+    apt install -y build-essential git curl wget unzip ripgrep fd-find
     log_success "Dependências instaladas."
 }
 
@@ -122,7 +122,7 @@ install_lazyvim() {
 # --- Função Principal ---
 main() {
     if [ "$(id -u)" -ne 0 ]; then
-       log_error "Este script precisa ser executado como root. Use 'sudo ./setup-neovim.sh'."
+       log_error "Este script precisa ser executado como root. Use 'sudo ./setup-neovim'."
        exit 1
     fi
     
