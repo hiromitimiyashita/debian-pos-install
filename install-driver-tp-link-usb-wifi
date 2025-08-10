@@ -1,0 +1,118 @@
+#!/bin/bash
+
+# ==============================================================================
+# Script Melhorado para Instalar Driver Wi-Fi Realtek (RTL8812AU)
+#
+# Versão: 2.0
+#
+# Este script automatiza a instalação do driver Wi-Fi para chipsets Realtek
+# usando o código-fonte do repositório aircrack-ng com suporte a DKMS.
+# ==============================================================================
+
+# --- Configuração de Robustez ---
+# Sai imediatamente se um comando falhar.
+set -e
+# Garante que falhas em pipelines (ex: cmd1 | cmd2) sejam capturadas.
+set -o pipefail
+# Trata erros de forma elegante, chamando a função error_handler.
+trap 'error_handler $? $LINENO' ERR
+
+# --- Funções de Feedback e Log ---
+log_step() {
+  echo -e "\n\e[1;35m>>> PASSO: $1\e[0m"
+}
+
+log_success() {
+  echo -e "\e[1;32m[SUCESSO] $1\e[0m"
+}
+
+log_error() {
+  echo -e "\e[1;31m[ERRO] $1\e[0m" >&2
+}
+
+log_info() {
+  echo -e "\e[1;34m[INFO] $1\e[0m"
+}
+
+# --- Tratamento de Erros ---
+error_handler() {
+  log_error "Ocorreu um erro na linha $2. Código de saída: $1."
+  exit 1
+}
+
+# --- Funções de Instalação ---
+
+check_root() {
+  if [ "$(id -u)" -ne 0 ]; then
+    log_error "Este script precisa ser executado como root ou com privilégios de sudo."
+    echo "Exemplo: sudo ./install-wifi-driver"
+    exit 1
+  fi
+}
+
+install_dependencies() {
+  log_step "Atualizando o sistema e instalando dependências"
+
+  log_info "Atualizando a lista de pacotes..."
+  apt update
+
+  log_info "Instalando ferramentas de compilação e pacotes necessários..."
+  # Instala as ferramentas para compilar o driver: headers do kernel, dkms e git.
+  apt install -y linux-headers-$(uname -r) build-essential bc dkms git
+
+  log_success "Dependências instaladas."
+}
+
+compile_and_install_driver() {
+  log_step "Baixando, compilando e instalando o driver via DKMS"
+
+  # Cria um diretório temporário seguro para o código-fonte
+  local TMP_DIR=$(mktemp -d)
+  log_info "Criado diretório temporário em: $TMP_DIR"
+
+  cd "$TMP_DIR"
+
+  log_info "Clonando o repositório do driver de aircrack-ng..."
+  git clone --depth 1 https://github.com/aircrack-ng/rtl8812au.git
+
+  cd rtl8812au/
+
+  log_info "Iniciando a instalação com DKMS..."
+  # O Makefile irá copiar os fontes para /usr/src e registrar no DKMS.
+  # O DKMS garantirá que o driver seja recompilado automaticamente para novos kernels.
+  make dkms_install
+
+  log_info "Limpando os arquivos temporários..."
+  rm -rf "$TMP_DIR"
+
+  log_success "Driver compilado e instalado via DKMS."
+}
+
+# --- Função Principal ---
+main() {
+  check_root
+
+  install_dependencies
+  compile_and_install_driver
+
+  echo ""
+  log_success "Instalação concluída com sucesso!"
+  log_info "O driver para o chipset RTL8811AU/RTL8812AU foi instalado."
+  log_info "Para que o novo módulo do kernel seja carregado, é necessário reiniciar."
+  echo ""
+
+  # Pergunta ao usuário se deseja reiniciar
+  read -p "Você deseja reiniciar o computador agora? (s/N): " choice
+  case "$choice" in
+  s | S)
+    log_info "Reiniciando o sistema..."
+    reboot
+    ;;
+  *)
+    log_warning "Reinicialização cancelada. Por favor, reinicie manualmente para ativar o driver."
+    ;;
+  esac
+}
+
+# --- Ponto de Entrada do Script ---
+main
