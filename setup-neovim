@@ -61,15 +61,23 @@ install_neovim() {
 
 # --- Download e Preparação da Nerd Font ---
 install_nerd_font() {
-    if [ -z "$SUDO_USER" ]; then
-        log_error "A variável \$SUDO_USER não está definida. Execute o script com 'sudo'."
-        exit 1
-    fi
+
+
+    # 1. Primeiro, tentamos definir o usuário alvo usando o plano A (SUDO_USER) ou o plano B (logname)
+TARGET_USER=${SUDO_USER:-$(logname)}
+
+
+# 2. AGORA SIM, depois de tentar as duas opções, verificamos se temos um resultado.
+if [ -z "$TARGET_USER" ]; then
+  # Se mesmo com o logname não achamos um usuário, aí sim damos erro.
+  echo "[ERRO] Não foi possível determinar o usuário original. Execute com 'sudo' ou de uma sessão de login válida."
+  exit 1
+fi
     
-    TARGET_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
     FONT_DIR="$TARGET_HOME/.local/share/fonts"
 
-    log_info "Baixando FiraCode Nerd Font para o usuário $SUDO_USER..."
+    log_info "Baixando FiraCode Nerd Font para o usuário $TARGET_USER..."
     mkdir -p "$FONT_DIR"
     
     # URL da fonte FiraCode Nerd Font (verifique por versões mais novas se desejar)
@@ -81,8 +89,8 @@ install_nerd_font() {
     rm "$FONT_ZIP_PATH"
 
     # Define as permissões corretas para o usuário
-    chown -R "$SUDO_USER":"$SUDO_USER" "$TARGET_HOME/.local"
-    
+    chown -R "$TARGET_USER":"$TARGET_USER" "$TARGET_HOME/.local"
+
     # Atualiza o cache de fontes do sistema
     fc-cache -fv
     
@@ -92,12 +100,22 @@ install_nerd_font() {
 
 # --- Instalação da configuração LazyVim ---
 install_lazyvim() {
-    if [ -z "$SUDO_USER" ]; then
-        log_error "A variável \$SUDO_USER não está definida. Execute o script com 'sudo'."
-        exit 1
-    fi
+# 1. Primeiro, tentamos definir o usuário alvo usando o plano A (SUDO_USER) ou o plano B (logname)
+TARGET_USER=${SUDO_USER:-$(logname)}
 
-    TARGET_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+
+# 2. AGORA SIM, depois de tentar as duas opções, verificamos se temos um resultado.
+if [ -z "$TARGET_USER" ]; then
+  # Se mesmo com o logname não achamos um usuário, aí sim damos erro.
+  echo "[ERRO] Não foi possível determinar o usuário original. Execute com 'sudo' ou de uma sessão de login válida."
+  exit 1
+fi
+
+
+
+
+
+    TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
     NVIM_CONFIG_DIR="$TARGET_HOME/.config/nvim"
     NVIM_DATA_DIR="$TARGET_HOME/.local/share/nvim"
 
@@ -109,8 +127,10 @@ install_lazyvim() {
     log_success "Backup concluído (se existia configuração)."
 
     log_info "Clonando o template do LazyVim..."
+
+
     # Clona como o usuário alvo para evitar problemas de permissão
-    sudo -u "$SUDO_USER" git clone https://github.com/LazyVim/starter "$NVIM_CONFIG_DIR"
+    sudo -u "$TARGET_USER" git clone https://github.com/LazyVim/starter "$NVIM_CONFIG_DIR"
 
     log_info "Removendo o diretório .git para você iniciar seu próprio versionamento..."
     rm -rf "$NVIM_CONFIG_DIR/.git"
@@ -122,7 +142,7 @@ install_lazyvim() {
 # --- Função Principal ---
 main() {
     if [ "$(id -u)" -ne 0 ]; then
-       log_error "Este script precisa ser executado como root. Use 'sudo ./setup-neovim'."
+       log_error "Este script precisa ser executado como root. Use 'sudo ./setup-neovim.sh'."
        exit 1
     fi
     
