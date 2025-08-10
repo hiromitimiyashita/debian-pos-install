@@ -115,12 +115,26 @@ install_android_studio() {
 
 # --- Configuração do Ambiente do Usuário ---
 configure_environment() {
-    if [ -n "$SUDO_USER" ]; then
-        TARGET_USER="$SUDO_USER"
-    else
-        log_error "Este script deve ser executado com 'sudo'. Não foi possível determinar o usuário alvo."
-        exit 1
-    fi
+
+# Verifica se estamos rodando como root, o que é um pré-requisito
+if [ "$(id -u)" -ne 0 ]; then
+    log_error "Este script precisa ser executado com privilégios de root (use sudo)."
+    exit 1
+fi
+
+# Tenta determinar o usuário alvo
+if [ -n "$SUDO_USER" ]; then
+    # O método preferido: o script foi chamado com "sudo"
+    TARGET_USER="$SUDO_USER"
+elif [ -n "$(logname)" ]; then
+    # O plano B: estamos em uma sessão root, mas podemos pegar o usuário que fez login
+    TARGET_USER="$(logname)"
+else
+    # Se nada funcionar, aí sim damos erro.
+    log_error "Não foi possível determinar o usuário alvo. Execute com 'sudo' a partir de uma sessão de usuário normal."
+    exit 1
+fi
+
 
     TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
 
