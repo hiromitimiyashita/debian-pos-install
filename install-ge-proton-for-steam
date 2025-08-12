@@ -1,0 +1,133 @@
+#!/bin/bash
+
+# ==============================================================================
+# Este script automatiza o download e a instalação do GE-Proton, detectando
+# automaticamente o diretório da Steam (Nativo, Flatpak) e usando 'jq' para
+# uma análise robusta da API do GitHub.
+# ==============================================================================
+
+# --- Configuração de Robustez ---
+# Ativa o modo de segurança: sai em caso de erro, erro em pipes, e trata variáveis não definidas como erro.
+set -euo pipefail
+
+# --- Funções Globais de Log ---
+log_step() { echo -e "\n\e[1;35m>>> PASSO: $1\e[0m"; }
+log_success() { echo -e "\e[1;32m[SUCESSO] $1\e[0m"; }
+log_error() { echo -e "\e[1;31m[ERRO] $1\e[0m" >&2; }
+log_info() { echo -e "\e[1;34m[INFO] $1\e[0m"; }
+
+# --- Funções de Lógica ---
+
+check_dependencies() {
+    log_step "Verificando dependências necessárias"
+    local missing_deps=0
+    for cmd in curl jq sha512sum tar; do
+        if ! command -v "$cmd" &> /dev/null; then
+            log_error "Dependência não encontrada: '$cmd'. Por favor, instale-a."
+            missing_deps=1
+        fi
+    done
+
+    if [ "$missing_deps" -eq 1 ]; then
+        log_error "Uma ou mais dependências não foram encontradas. Em sistemas Debian, instale com: sudo apt install curl jq"
+        exit 1
+    fi
+    log_success "Todas as dependências foram encontradas."
+}
+
+find_steam_dir() {
+    log_step "Detectando diretório de instalação da Steam"
+    # Ordem de verificação: Flatpak, Nativo Padrão, Nativo Legado
+    if [ -d "$HOME/.var/app/com.valvesoftware.Steam" ]; then
+        STEAM_DIR_TARGET="$HOME/.var/app/com.valvesoftware.Steam/data/Steam/compatibilitytools.d"
+        log_info "Detectada instalação do Steam via Flatpak."
+    elif [ -d "$HOME/.steam/steam" ]; then
+        STEAM_DIR_TARGET="$HOME/.steam/steam/compatibilitytools.d"
+        log_info "Detectada instalação nativa do Steam."
+    elif [ -d "$HOME/.steam/root" ]; then
+        STEAM_DIR_TARGET="$HOME/.steam/root/compatibilitytools.d"
+        log_info "Detectada instalação nativa do Steam (caminho legado)."
+    else
+        log_error "Não foi possível encontrar um diretório de instalação do Steam conhecido."
+        exit 1
+    fi
+    # Cria o diretório de destino se não existir
+    mkdir -p "$STEAM_DIR_TARGET"
+    log_success "Diretório de destino: $STEAM_DIR_TARGET"
+}
+
+fetch_release_info() {
+    log_step "Buscando a versão mais recente do GE-Proton"
+    local API_URL="https://api.github.com/repos/GloriousEggroll/proton-ge-custom/releases/latest"
+
+    log_info "Consultando a API do GitHub..."
+    # Faz uma única chamada à API e guarda a resposta
+    API_RESPONSE=$(curl -s "$API_URL")
+
+    # Usa 'jq' para extrair os URLs de forma segura e robusta
+    TARBALL_URL=$(echo "$API_RESPONSE" | jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .browser_download_url')
+    CHECKSUM_URL=$(echo "$API_RESPONSE" | jq -r '.assets[] | select(.name | endswith(".sha512sum")) | .browser_download_url')
+
+    if [ -z "$TARBALL_URL" ] || [ -z "$CHECKSUM_URL" ]; then
+        log_error "Não foi possível obter os URLs de download da API do GitHub. Verifique sua conexão."
+        exit 1
+    fi
+
+    TARBALL_NAME=$(basename "$TARBALL_URL")
+    log_success "Encontrada a versão mais recente: $TARBALL_NAME"
+}
+
+download_and_verify() {
+    log_step "Baixando e verificando os arquivos"
+
+    # Cria um diretório de trabalho temporário seguro
+    TMP_DIR=$(mktemp -d)
+    cd "$TMP_DIR"
+    log_info "Trabalhando no diretório temporário: $TMP_DIR"
+
+    # Função para limpar o diretório temporário ao sair do script
+    cleanup() {
+        log_info "Limpando arquivos temporários..."
+        rm -rf "$TMP_DIR"
+    }
+    trap cleanup EXIT
+
+    log_info "Baixando: $TARBALL_NAME"
+    curl -L -# "$TARBALL_URL" -o "$TARBALL_NAME"
+
+    log_info "Baixando checksum..."
+    curl -L -# "$CHECKSUM_URL" -o "checksum.sha512sum"
+
+    log_info "Verificando a integridade do arquivo..."
+    # 'cd' para o diretório temporário garante que o sha512sum encontre o arquivo
+    (cd "$TMP_DIR" && sha512sum -c "checksum.sha512sum")
+    log_success "Verificação de checksum bem-sucedida."
+}
+
+install_proton_release() {
+    log_step "Instalando o GE-Proton"
+    log_info "Extraindo $TARBALL_NAME para o diretório do Steam..."
+    tar -xf "$TMP_DIR/$TARBALL_NAME" -C "$STEAM_DIR_TARGET"
+    log_success "GE-Proton instalado com sucesso!"
+}
+
+# --- Função Principal ---
+main() {
+    clear
+    echo "=========================================="
+    echo "  Instalador Automatizado do GE-Proton  "
+    echo "=========================================="
+
+    check_dependencies
+    find_steam_dir
+    fetch_release_info
+    download_and_verify
+    install_proton_release
+
+    echo
+    log_step "INSTALAÇÃO CONCLUÍDA"
+    log_warning "Por favor, reinicie COMPLETAMENTE o cliente Steam para que a nova versão do GE-Proton seja reconhecida."
+}
+
+# --- Ponto de Entrada do Script ---
+main
