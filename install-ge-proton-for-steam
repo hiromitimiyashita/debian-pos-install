@@ -18,6 +18,17 @@ log_info() { echo -e "\e[1;34m[INFO] $1\e[0m"; }
 
 # --- Funções de Lógica ---
 
+check_permissions() {
+    log_step "Verificando permissões de execução"
+    # Este script deve ser executado pelo usuário, NÃO como root/sudo.
+    if [ "$(id -u)" -eq 0 ]; then
+        log_error "Este script NÃO deve ser executado com 'sudo' ou como usuário root."
+        log_error "Ele manipula arquivos na sua pasta pessoal e precisa ser executado como o seu usuário normal."
+        log_info "Por favor, execute o script sem 'sudo'. Exemplo: ./seu_script.sh"
+        exit 1
+    fi
+    log_success "Script executado com as permissões corretas (usuário normal)."
+}
 check_dependencies() {
     log_step "Verificando dependências necessárias"
     local missing_deps=0
@@ -133,7 +144,7 @@ main() {
     echo "=========================================="
     echo "  Instalador Automatizado do GE-Proton  "
     echo "=========================================="
-
+check_permissions
     check_dependencies
     find_steam_dir
     fetch_release_info
