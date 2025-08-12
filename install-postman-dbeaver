@@ -1,0 +1,119 @@
+#!/bin/bash
+
+# ==============================================================================
+# Instala de forma segura e interativa o Postman (manual) e o DBeaver (via APT).
+# ==============================================================================
+
+# --- Configuração de Robustez ---
+# Para a execução se qualquer comando falhar.
+set -e
+# Garante que falhas em pipelines (ex: cmd1 | cmd2) sejam capturadas.
+set -o pipefail
+# Trata erros de forma elegante, chamando a função error_handler.
+trap 'error_handler $? $LINENO' ERR
+
+# --- Funções Globais de Log e Erro ---
+log_step() { echo -e "\n\e[1;35m>>> PASSO: $1\e[0m"; }
+log_success() { echo -e "\e[1;32m[SUCESSO] $1\e[0m"; }
+log_error() { echo -e "\e[1;31m[ERRO] $1\e[0m" >&2; }
+log_info() { echo -e "\e[1;34m[INFO] $1\e[0m"; }
+
+error_handler() {
+    log_error "Ocorreu um erro na linha $2. Código de saída: $1."
+    exit 1
+}
+
+# --- Funções de Instalação ---
+
+check_permissions() {
+    log_step "Verificando permissões de execução"
+    if [ "$(id -u)" -ne 0 ]; then
+        log_error "Este script precisa ser executado como root ou com privilégios de sudo."
+        echo "Exemplo: sudo ./seu_script.sh"
+        exit 1
+    fi
+    log_success "Permissões de root verificadas."
+}
+
+install_postman() {
+    log_step "Instalando o Postman"
+    
+    log_info "Baixando a versão mais recente para /tmp..."
+    wget "https://dl.pstmn.io/download/latest/linux_64" -O /tmp/postman.tar.gz
+
+    log_info "Extraindo arquivos para /opt/Postman..."
+    mkdir -p /opt/Postman
+    tar -xzf /tmp/postman.tar.gz -C /opt/Postman --strip-components=1
+    
+    log_info "Limpando o arquivo baixado..."
+    rm /tmp/postman.tar.gz
+
+    log_info "Criando link simbólico em /usr/local/bin/postman..."
+    ln -sf /opt/Postman/Postman /usr/local/bin/postman
+
+    log_info "Criando atalho no menu de aplicativos..."
+    tee /usr/share/applications/postman.desktop > /dev/null <<EOF
+[Desktop Entry]
+Encoding=UTF-8
+Name=Postman
+Exec=/opt/Postman/Postman
+Icon=/opt/Postman/app/resources/app/assets/icon.png
+Terminal=false
+Type=Application
+Categories=Development;
+EOF
+
+    log_success "Postman foi instalado com sucesso!"
+}
+
+install_dbeaver() {
+    log_step "Instalando o DBeaver Community Edition"
+
+    log_info "Adicionando a chave GPG e o repositório oficial do DBeaver..."
+    wget -O /usr/share/keyrings/dbeaver.gpg https://dbeaver.io/debs/dbeaver.gpg
+    echo "deb [signed-by=/usr/share/keyrings/dbeaver.gpg] https://dbeaver.io/debs/dbeaver-ce /" | tee /etc/apt/sources.list.d/dbeaver.list > /dev/null
+
+    log_info "Atualizando a lista de pacotes do sistema..."
+    apt update
+
+    log_info "Instalando o pacote dbeaver-ce..."
+    apt install -y dbeaver-ce
+
+    log_success "DBeaver foi instalado com sucesso!"
+}
+
+# --- Função Principal ---
+main() {
+    clear
+    echo "================================================="
+    echo "  Instalador de Ferramentas de Desenvolvimento   "
+    echo "================================================="
+    
+    check_permissions
+
+    # --- Menu de Seleção ---
+    read -p "Deseja instalar o Postman? (S/n): " choice_postman
+    read -p "Deseja instalar o DBeaver? (S/n): " choice_dbeaver
+
+    if [[ "${choice_postman:-s}" =~ ^[Ss]$ ]]; then
+        install_postman
+    else
+        log_info "Instalação do Postman pulada."
+    fi
+
+    if [[ "${choice_dbeaver:-s}" =~ ^[Ss]$ ]]; then
+        install_dbeaver
+    else
+        log_info "Instalação do DBeaver pulada."
+    fi
+
+    # --- Mensagem Final ---
+    echo ""
+    log_step "PROCESSO FINALIZADO"
+    log_success "As operações selecionadas foram concluídas."
+    log_info "Você pode encontrar os aplicativos instalados no seu menu, na categoria 'Desenvolvimento'."
+    echo "================================================="
+}
+
+# --- Ponto de Entrada do Script ---
+main
