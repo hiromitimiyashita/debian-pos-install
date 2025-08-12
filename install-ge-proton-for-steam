@@ -36,24 +36,40 @@ check_dependencies() {
 }
 
 find_steam_dir() {
-    log_step "Detectando diretório de instalação da Steam"
-    # Ordem de verificação: Flatpak, Nativo Padrão, Nativo Legado
-    if [ -d "$HOME/.var/app/com.valvesoftware.Steam" ]; then
-        STEAM_DIR_TARGET="$HOME/.var/app/com.valvesoftware.Steam/data/Steam/compatibilitytools.d"
-        log_info "Detectada instalação do Steam via Flatpak."
-    elif [ -d "$HOME/.steam/steam" ]; then
-        STEAM_DIR_TARGET="$HOME/.steam/steam/compatibilitytools.d"
-        log_info "Detectada instalação nativa do Steam."
-    elif [ -d "$HOME/.steam/root" ]; then
-        STEAM_DIR_TARGET="$HOME/.steam/root/compatibilitytools.d"
-        log_info "Detectada instalação nativa do Steam (caminho legado)."
-    else
-        log_error "Não foi possível encontrar um diretório de instalação do Steam conhecido."
+
+# Array de possíveis diretórios base da Steam, em ordem de prioridade.
+    # A sua descoberta do caminho '.steam/debian-installation' foi crucial e adicionada aqui.
+    local steam_paths=(
+        "$HOME/.var/app/com.valvesoftware.Steam/data/Steam"  # 1. Prioridade para Flatpak
+        "$HOME/.steam/debian-installation"                  # 2. Prioridade para a instalação via APT no Debian (o seu caso)
+        "$HOME/.steam/root"                                 # 3. Fallback para instalações nativas
+        "$HOME/.steam/steam"                                # 4. Fallback final para instalações nativas
+    )
+
+    local found_path=""
+    # Loop para verificar cada caminho potencial
+    for path in "${steam_paths[@]}"; do
+        log_info "Verificando o caminho: ${path}..."
+        # Verifica se o caminho existe E é um diretório
+        if [ -d "$path" ]; then
+            found_path="$path"
+            log_info "Diretório base da Steam encontrado em: $found_path"
+            break # Sai do loop assim que encontrar o caminho válido
+        fi
+    done
+
+    # Se, após o loop, nenhum caminho for encontrado, o script falha com uma mensagem clara.
+    if [ -z "$found_path" ]; then
+        log_error "Não foi possível encontrar um diretório de instalação do Steam válido e funcional."
+        log_error "Dica: Verifique se a Steam já foi executada pelo menos uma vez para criar seus diretórios."
         exit 1
     fi
-    # Cria o diretório de destino se não existir
+
+    # Define o diretório final para as ferramentas de compatibilidade
+    STEAM_DIR_TARGET="${found_path}/compatibilitytools.d"
     mkdir -p "$STEAM_DIR_TARGET"
-    log_success "Diretório de destino: $STEAM_DIR_TARGET"
+    log_success "Diretório de destino para o GE-Proton: $STEAM_DIR_TARGET"
+
 }
 
 fetch_release_info() {
