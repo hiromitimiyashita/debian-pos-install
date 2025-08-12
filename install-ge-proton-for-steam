@@ -151,7 +151,7 @@ check_permissions
     download_and_verify
     install_proton_release
 
-    echo
+  
     log_step "INSTALAÇÃO CONCLUÍDA"
     log_warning "Por favor, reinicie COMPLETAMENTE o cliente Steam para que a nova versão do GE-Proton seja reconhecida."
 }
