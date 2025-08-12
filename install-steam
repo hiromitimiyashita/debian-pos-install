@@ -67,7 +67,9 @@ prepare_repositories() {
     log_step "Preparando Repositórios do Sistema e Arquitetura"
 
     log_info "Configurando os repositórios APT (adicionando contrib, non-free, non-free-firmware)..."
-    # Este método é mais robusto que 'apt-add-repository'
+    
+    # Este comando 'sed' substitui de forma inteligente toda a seção de componentes
+    # nas linhas 'deb' e 'deb-src', garantindo a sequência correta.
     sed -i -E 's#^(deb(-src)?\s+[^ ]+\s+[^ ]+)\s+.*#\1 main contrib non-free non-free-firmware#' /etc/apt/sources.list
 
     log_info "Habilitando a arquitetura i386 (necessária para a Steam)..."
