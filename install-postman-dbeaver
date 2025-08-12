@@ -70,7 +70,10 @@ install_dbeaver() {
     log_step "Instalando o DBeaver Community Edition"
 
     log_info "Adicionando a chave GPG e o repositório oficial do DBeaver..."
-    wget -O /usr/share/keyrings/dbeaver.gpg https://dbeaver.io/debs/dbeaver.gpg
+
+    # O método robusto é baixar a chave com 'curl' e usar 'gpg --dearmor'.
+    curl -fsSL https://dbeaver.io/debs/dbeaver.gpg.key | gpg --dearmor -o /usr/share/keyrings/dbeaver.gpg
+
     echo "deb [signed-by=/usr/share/keyrings/dbeaver.gpg] https://dbeaver.io/debs/dbeaver-ce /" | tee /etc/apt/sources.list.d/dbeaver.list > /dev/null
 
     log_info "Atualizando a lista de pacotes do sistema..."
