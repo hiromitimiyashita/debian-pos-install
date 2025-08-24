@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==============================================================================
-# Este script automatiza a adição do repositório oficial do BalenaEtcher
-# e a instalação do pacote via apt-get, com estrutura e logs aprimorados.
+# Este script automatiza o download, organização e integração do AppImage
+# mais recente do BalenaEtcher, criando atalhos e comandos de terminal.
 # ==============================================================================
 
 # --- Configuração de Robustez ---
@@ -15,68 +15,117 @@ log_step() { echo -e "\n\e[1;35m>>> PASSO: $1\e[0m"; }
 log_success() { echo -e "\e[1;32m[SUCESSO] $1\e[0m"; }
 log_error() { echo -e "\e[1;31m[ERRO] $1\e[0m" >&2; }
 log_info() { echo -e "\e[1;34m[INFO] $1\e[0m"; }
+log_warning() { echo -e "\e[1;33m[AVISO] $1\e[0m"; }
 
 error_handler() {
     log_error "Ocorreu um erro na linha $2. Código de saída: $1."
     exit 1
 }
 
+# --- Variáveis Globais ---
+# Diretório de instalação (dentro da pasta do usuário)
+INSTALL_DIR="$HOME/.local/opt/BalenaEtcher"
+# Diretório para atalhos de aplicativos
+APPS_DIR="$HOME/.local/share/applications"
+# Diretório para comandos do usuário
+BIN_DIR="$HOME/.local/bin"
+
 # --- Funções de Lógica ---
 
-check_permissions() {
-    log_step "Verificando permissões de execução"
-    if [ "$(id -u)" -ne 0 ]; then
-        log_error "Este script precisa ser executado como root. Por favor, use 'sudo $0'"
-        exit 1
-    fi
-    log_success "Permissões de root verificadas."
-}
-
 check_dependencies() {
-    log_step "Verificando dependências essenciais para o script"
-    if ! command -v curl &> /dev/null; then
-        log_error "O comando 'curl' não foi encontrado. Ele é necessário para adicionar o repositório."
-        log_info "Por favor, instale-o com: sudo apt install curl"
+    log_step "Verificando dependências necessárias"
+    if ! command -v curl &> /dev/null || ! command -v jq &> /dev/null; then
+        log_error "Dependências 'curl' e 'jq' são necessárias."
+        log_info "Por favor, instale-as com: sudo apt update && sudo apt install curl jq"
         exit 1
     fi
-    log_success "Dependência 'curl' encontrada."
+    log_success "Dependências encontradas."
 }
 
-add_etcher_repository() {
-    log_step "Adicionando o repositório oficial do BalenaEtcher"
-    log_info "Executando o script de configuração fornecido pelo Balena..."
-    # Este comando baixa e executa o script oficial para adicionar a chave GPG e o repositório
-    curl -1sLf 'https://dl.cloudsmith.io/public/balena/etcher/setup.deb.sh' | bash
-    log_success "Repositório adicionado com sucesso."
+fetch_latest_appimage() {
+    log_step "Buscando a versão mais recente do BalenaEtcher"
+    local API_URL="https://api.github.com/repos/balena-io/etcher/releases/latest"
+    
+    log_info "Consultando a API do GitHub..."
+    local API_RESPONSE
+    API_RESPONSE=$(curl --silent --fail "$API_URL")
+
+    # Usa 'jq' para encontrar o URL do AppImage para arquitetura x64
+    APPIMAGE_URL=$(echo "$API_RESPONSE" | jq -r '.assets[] | select(.name | test("x64.AppImage$")) | .browser_download_url')
+
+    if [ -z "$APPIMAGE_URL" ]; then
+        log_error "Não foi possível encontrar o URL de download do AppImage na API do GitHub."
+        exit 1
+    fi
+    
+    local APPIMAGE_NAME=$(basename "$APPIMAGE_URL")
+    log_success "Versão mais recente encontrada: $APPIMAGE_NAME"
 }
 
-install_etcher_package() {
-    log_step "Instalando o BalenaEtcher"
-    log_info "Atualizando a lista de pacotes do novo repositório..."
-    apt update
-    log_info "Instalando o pacote 'balena-etcher-electron'..."
-    apt install -y balena-etcher-electron
-    log_success "BalenaEtcher foi instalado com sucesso!"
+download_and_setup() {
+    log_step "Baixando e configurando o AppImage"
+    
+    # Garante que os diretórios de destino existam
+    mkdir -p "$INSTALL_DIR"
+    mkdir -p "$APPS_DIR"
+    mkdir -p "$BIN_DIR"
+    
+    log_info "Baixando AppImage para $INSTALL_DIR..."
+    curl -L -# "$APPIMAGE_URL" -o "$INSTALL_DIR/balena-etcher.AppImage"
+    
+    log_info "Tornando o arquivo executável..."
+    chmod +x "$INSTALL_DIR/balena-etcher.AppImage"
+    
+    log_success "AppImage baixado e configurado."
 }
+
+create_shortcut_and_command() {
+    log_step "Criando atalhos e comando de terminal"
+
+    log_info "Baixando o ícone oficial..."
+    # A URL do ícone pode mudar, mas esta é a padrão do repositório
+    curl -L "https://raw.githubusercontent.com/balena-io/etcher/master/assets/icon.png" -o "$INSTALL_DIR/icon.png"
+
+    log_info "Criando atalho no menu de aplicativos..."
+    tee "$APPS_DIR/balena-etcher.desktop" > /dev/null <<EOF
+[Desktop Entry]
+Version=1.0
+Name=BalenaEtcher
+Comment=Flash OS images to SD cards & USB drives
+Exec="$INSTALL_DIR/balena-etcher.AppImage" %U
+Icon=$INSTALL_DIR/icon.png
+Terminal=false
+Type=Application
+Categories=Utility;System;
+EOF
+    
+    log_info "Criando comando de terminal 'balena-etcher'..."
+    # Cria um link simbólico no diretório bin do usuário
+    ln -sf "$INSTALL_DIR/balena-etcher.AppImage" "$BIN_DIR/balena-etcher"
+    
+    log_success "Atalho e comando criados com sucesso."
+    log_warning "Pode ser necessário fazer logout/login para que o atalho do menu apareça."
+}
+
 
 # --- Função Principal ---
 main() {
     clear
     echo "=========================================="
-    echo "  Instalador Automatizado do BalenaEtcher  "
+    echo "  Instalador do BalenaEtcher (AppImage)  "
     echo "=========================================="
     
-    check_permissions
     check_dependencies
-    add_etcher_repository
-    install_etcher_package
-    
-    # --- Mensagem Final ---
-    echo ""
+    fetch_latest_appimage
+    download_and_setup
+    create_shortcut_and_command
+
+    echo
     log_step "INSTALAÇÃO CONCLUÍDA"
-    log_info "Você pode iniciar o BalenaEtcher a partir do seu menu de aplicativos ou"
-    log_info "executando o seguinte comando no terminal:"
-    echo -e "\e[1;33mbalena-etcher-electron\e[0m"
+    log_info "Você pode iniciar o BalenaEtcher de três formas:"
+    echo "1. Pelo seu menu de aplicativos (procure por 'BalenaEtcher')."
+    echo "2. Pelo terminal, digitando: balena-etcher"
+    echo "3. Executando diretamente: $INSTALL_DIR/balena-etcher.AppImage"
     echo "=========================================="
 }
 
