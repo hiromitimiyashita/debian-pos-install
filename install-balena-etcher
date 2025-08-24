@@ -53,9 +53,9 @@ add_etcher_repository() {
 install_etcher_package() {
     log_step "Instalando o BalenaEtcher"
     log_info "Atualizando a lista de pacotes do novo repositório..."
-    apt-get update
+    apt update
     log_info "Instalando o pacote 'balena-etcher-electron'..."
-    apt-get install -y balena-etcher-electron
+    apt install -y balena-etcher-electron
     log_success "BalenaEtcher foi instalado com sucesso!"
 }
 
