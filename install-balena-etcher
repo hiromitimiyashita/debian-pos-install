@@ -1,0 +1,84 @@
+#!/bin/bash
+
+# ==============================================================================
+# Este script automatiza a adição do repositório oficial do BalenaEtcher
+# e a instalação do pacote via apt-get, com estrutura e logs aprimorados.
+# ==============================================================================
+
+# --- Configuração de Robustez ---
+set -e
+set -o pipefail
+trap 'error_handler $? $LINENO' ERR
+
+# --- Funções Globais de Log e Erro ---
+log_step() { echo -e "\n\e[1;35m>>> PASSO: $1\e[0m"; }
+log_success() { echo -e "\e[1;32m[SUCESSO] $1\e[0m"; }
+log_error() { echo -e "\e[1;31m[ERRO] $1\e[0m" >&2; }
+log_info() { echo -e "\e[1;34m[INFO] $1\e[0m"; }
+
+error_handler() {
+    log_error "Ocorreu um erro na linha $2. Código de saída: $1."
+    exit 1
+}
+
+# --- Funções de Lógica ---
+
+check_permissions() {
+    log_step "Verificando permissões de execução"
+    if [ "$(id -u)" -ne 0 ]; then
+        log_error "Este script precisa ser executado como root. Por favor, use 'sudo $0'"
+        exit 1
+    fi
+    log_success "Permissões de root verificadas."
+}
+
+check_dependencies() {
+    log_step "Verificando dependências essenciais para o script"
+    if ! command -v curl &> /dev/null; then
+        log_error "O comando 'curl' não foi encontrado. Ele é necessário para adicionar o repositório."
+        log_info "Por favor, instale-o com: sudo apt install curl"
+        exit 1
+    fi
+    log_success "Dependência 'curl' encontrada."
+}
+
+add_etcher_repository() {
+    log_step "Adicionando o repositório oficial do BalenaEtcher"
+    log_info "Executando o script de configuração fornecido pelo Balena..."
+    # Este comando baixa e executa o script oficial para adicionar a chave GPG e o repositório
+    curl -1sLf 'https://dl.cloudsmith.io/public/balena/etcher/setup.deb.sh' | bash
+    log_success "Repositório adicionado com sucesso."
+}
+
+install_etcher_package() {
+    log_step "Instalando o BalenaEtcher"
+    log_info "Atualizando a lista de pacotes do novo repositório..."
+    apt-get update
+    log_info "Instalando o pacote 'balena-etcher-electron'..."
+    apt-get install -y balena-etcher-electron
+    log_success "BalenaEtcher foi instalado com sucesso!"
+}
+
+# --- Função Principal ---
+main() {
+    clear
+    echo "=========================================="
+    echo "  Instalador Automatizado do BalenaEtcher  "
+    echo "=========================================="
+    
+    check_permissions
+    check_dependencies
+    add_etcher_repository
+    install_etcher_package
+    
+    # --- Mensagem Final ---
+    echo ""
+    log_step "INSTALAÇÃO CONCLUÍDA"
+    log_info "Você pode iniciar o BalenaEtcher a partir do seu menu de aplicativos ou"
+    log_info "executando o seguinte comando no terminal:"
+    echo -e "\e[1;33mbalena-etcher-electron\e[0m"
+    echo "=========================================="
+}
+
+# --- Ponto de Entrada do Script ---
+main
